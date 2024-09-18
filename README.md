@@ -1,4 +1,3 @@
-
 ## About
 *Updated Sep. 17 2024*
 This repo contains training and testing code for **Feature Encapsulation for Neural Circuit Explainability (FENCE)**.
@@ -18,14 +17,13 @@ This repo contains training and testing code for **Feature Encapsulation for Neu
 ### Initial Setup
 1. Rent a Runpod instance. You need an H100 for training, an A6000 will work fine for inference.
 2. Connect to Jupyter Lab.
-3. Create a PAT in Github with full read/write permissions.
-4. In a terminal in Jupyter lab, `cd` to your user folder. Then, clone your repo with `git clone https://{PAT}@github.com/bongohead/fence.git`.
-5. Add credentials to this git repo.
+3. In a terminal in Jupyter lab, `cd` to your user folder. Then, clone your repo with `git clone https://github.com/bongohead/fence.git`.
+4. Add credentials to this git repo.
     ```
     git config user.email "{some_email_connected_to_your_github@email.com}"
     git config user.name {your_name}
     ```
-6. Now after changes you should be able to push normally, `git push origin master`.
+5. Now after changes you should be able to push normally, `git push origin master`.
 
 **Important:** Push VERY REGULARLY to the remote Git server. Make work as state-independent as possible, as everything not saved in Git will be destroyed every time the cloud server is turned off.
 *Note*: Hidden files aren't shown in the Jupyter lab file sidebar (you'll have to use `nano`), so be careful managing `.env` - make sure you don't commit secrets to your Git repo! If you create a secrets file, download it to your local computer when you're finished with your work, as it'll be destroyed since it's outside Git.
