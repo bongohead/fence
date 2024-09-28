@@ -65,7 +65,7 @@ def visualize_fence(
         draw_mat, color_continuous_scale = custom_colorscale,
         labels = dict(x = 'Dimension', y = 'Token', color = 'Output'),
         zmin = min_range - (max_range - min_range)/2, zmax = max_range + (max_range - min_range)/2,
-        # aspect = 'auto'
+        aspect = 'auto'
         )\
         .update_layout(
             height = 10 + len(custom_y) * 11,
