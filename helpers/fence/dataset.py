@@ -13,6 +13,7 @@ class FenceDataSet(torch.utils.data.Dataset):
             @tokens: A dict containing two keys: `input_ids` containing an I x N tensor; and `attention_mask` containing an I x N tensor
             @fence_dict: A dict of features and their corresponding fence dimensions, e.g. {'dogs': (3065, 3068), 'cats': (3061, 3064)}. 
              - These dimensions are 1-indexed and inclusive of both the start and ending numbers passed into the tuples. (3061, 3064) means dimensions 3061, 3062, 3063, and 3064.
+            @D: The hidden state dimension
             @feature_classifications: An I-length list of dicts where each dict is a target class [{'cat': 1, 'dog': 0'}, {'cat': 0, 'dog': 1}]
             @position_mask_start_token_id: A token ID. When creating the FENCE mask for each sentence, each token is assigned a 0 or 1. 
              - Tokens are assigned a 0 if they are 0 within the attention mask (i.e., a padding token), or are values that occur BEFORE or EQUAL to the first instance
