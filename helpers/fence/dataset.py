@@ -52,12 +52,19 @@ class FenceDataSet(torch.utils.data.Dataset):
         ]).to(tokens['input_ids'].device)
         
         feature_targets_list = []
+        # for feat_classes in feature_classifications:
+        #     zeros = torch.zeros(D)
+        #     for k, v in fence_dict.items():
+        #         if feat_classes[k] == 1:
+        #             zeros[fence_dict[k][0] - 1:fence_dict[k][1]] = 1
+        #     feature_targets_list.append(zeros)
+        
         for feat_classes in feature_classifications:
-            zeros = torch.zeros(D)
-            for k, v in fence_dict.items():
-                if feat_classes[k] == 1:
-                    zeros[fence_dict[k][0] - 1:fence_dict[k][1]] = 1
-            feature_targets_list.append(zeros)
+            feature_targets_for_ex = torch.cat([
+                torch.ones(v[1] - v[0] + 1) if feat_classes[k] == 1 else torch.zeros(v[1] - v[0] + 1)
+                for k, v in fence_dict.items()
+            ], dim = 0)
+            feature_targets_list.append(feature_targets_for_ex)
 
         self.feature_targets = torch.stack(feature_targets_list, dim = 0).to(tokens['input_ids'].device)
 
