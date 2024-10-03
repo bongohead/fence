@@ -61,10 +61,12 @@ def visualize_fence(
         [0.8001, 'rgba(128, 128, 128, 0.9)'], [1.0, 'rgba(128, 128, 128, 0.9)']
     ]
 
+    tol_scale_factor = 0.8 # Extra "tolerance" range around min/max where red/green is shown instead of gray
+    
     fig = px.imshow(
         draw_mat, color_continuous_scale = custom_colorscale,
         labels = dict(x = 'Dimension', y = 'Token', color = 'Output'),
-        zmin = min_range - (max_range - min_range)/2, zmax = max_range + (max_range - min_range)/2,
+        zmin = min_range - (max_range - min_range) * tol_scale_factor, zmax = max_range + (max_range - min_range) * tol_scale_factor,
         aspect = 'auto'
         )\
         .update_layout(
@@ -76,13 +78,14 @@ def visualize_fence(
         .update_xaxes(tickvals = filtered_indices, ticktext = filtered_x, tickfont = {'size': 10.5})
 
     for fname, fdim in fence_dict.items():
-        start_ix = fdim[0] - (start_dim - 1)
+        start_ix = fdim[0] - (start_dim - 1) - 1
         end_ix = fdim[1] - (start_dim - 1)
         fig\
             .add_shape(type = 'rect', x0 = start_ix - .5, y0 = -.5, x1 = end_ix - .5, y1 = test_mat.shape[0] - .5,  xref = 'x', yref = 'y', line = {'color': 'black', 'width': 2})\
             .add_annotation(
                 x = (start_ix + end_ix - 1)/2, y = -2, xref = 'x', yref = 'y', 
-                text =  fname + ' (<span style="text-decoration:overline">D<sub>f</sub></span> = ' + str(test_mat[:, (start_ix - 1):end_ix].mean().round(2)) + ')',
+                # text =  fname + ' (<span style="text-decoration:overline">D<sub>f</sub></span> = ' + str(test_mat[:, (start_ix - 1):end_ix].mean().round(2)) + ')',
+                text =  fname,
                 showarrow = False, font = {'color': 'black', 'size': 9}, align = 'center'
             )
 
