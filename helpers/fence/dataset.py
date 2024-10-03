@@ -37,6 +37,8 @@ class FenceDataSet(torch.utils.data.Dataset):
         self.F = len(fence_dict)
         self.I = tokens['input_ids'].shape[0]
         self.N = tokens['input_ids'].shape[1]
+        
+        # Get a D-dimension Dfmask which shows 1 for regions where FENCE is active
         self.Df = np.sum([v[1] - v[0] + 1 for _, v in fence_dict.items()])
         
         self.tokens = tokens
