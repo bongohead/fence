@@ -1,5 +1,5 @@
 ## About
-*Updated Sep. 17 2024*
+*Updated Oct 2024*
 This repo contains training and testing code for **Feature Encapsulation for Neural Circuit Explainability (FENCE)**.
 
 - First, follow the instructions below in `Setting up Runpod` below to set up a working Runpod instance.
@@ -12,12 +12,13 @@ This repo contains training and testing code for **Feature Encapsulation for Neu
 - Run `python3 train-v3.py` to train FENCE via CLI. Models will be saved every epoch in `models/`.
 - Note the training code currently uses flash attention and bfloat16 (except for self-attention modules), edit these if needed.
 
-## Setting up Runpod
+## Setup 
+The below instructions are for Runpod, but you can use another host or a local server as well, provided you have access to a CUDA GPU. 
 
 ### Initial Setup
 1. Rent a Runpod instance. You need an H100 for training, an A6000 will work fine for inference.
-2. Connect to Jupyter Lab.
-3. In a terminal in Jupyter lab, `cd` to your user folder. Then, clone your repo with `git clone https://github.com/bongohead/fence.git`.
+2. SSH into the server.
+3. In the terminal, `cd` to your user folder. Then, clone your repo with `git clone https://github.com/bongohead/fence.git`.
 4. Add credentials to this git repo.
     ```
     git config user.email "{some_email_connected_to_your_github@email.com}"
@@ -26,12 +27,11 @@ This repo contains training and testing code for **Feature Encapsulation for Neu
 5. Now after changes you should be able to push normally, `git push origin master`.
 
 **Important:** Push VERY REGULARLY to the remote Git server. Make work as state-independent as possible, as everything not saved in Git will be destroyed every time the cloud server is turned off.
-*Note*: Hidden files aren't shown in the Jupyter lab file sidebar (you'll have to use `nano`), so be careful managing `.env` - make sure you don't commit secrets to your Git repo! If you create a secrets file, download it to your local computer when you're finished with your work, as it'll be destroyed since it's outside Git.
 
 ### Installing packages
-Don't setup a new virtual env. By default, you'll always be using the Python3.10 env that comes with this Jupyter lab.
+Setup a new virtual env if you need to (there is no need in Runpod, just use the base venv). To install necessary packages, run `sh install_packages.sh`.
 
-To install packages, just do `!pip install {package}` from a `.ipynb` file. Make sure you save the `!pip install {package}` code you use, as you may have to reinstall them whenever the server is rebooted. Use `setup.ipynb`.
+For Runpod, you should also run `sh runpod_setup.sh` to update necessary dependencies.
 
 ### Monitoring
 You can use the following function to monitor GPU memory:
@@ -47,7 +47,3 @@ check_memory()
 ```
 
 Disk space can be monitered with the command `du -hs $HOME /workspace/*`. We have 100GB available in total.
-
-### Misc/Admin
-- To install `nano`, run `apt update & apt upgrade & apt install nano`
-- If there's an error, open a web terminal and run `pip install jupyterlab ipywidgets jupyterlab-widgets --upgrade`
