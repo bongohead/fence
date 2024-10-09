@@ -1,6 +1,9 @@
 ## About
 *Updated Oct 2024*
 This repo contains training and testing code for **Feature Encapsulation for Neural Circuit Explainability (FENCE)**.
+<p align="center">
+  <img src="https://github.com/bongohead/fence/blob/master/docs/t1.png?raw=true" alt="FENCE diagram" height="300"/>
+</p>
 
 ## Initial Setup
 1. Acquire a server with a CUDA-compatible GPU (e.g., by renting on a cloud GPU service like Vast.ai or Runpod). You need an H100 for training, an A6000 will work fine for inference.
