@@ -1,6 +1,65 @@
 import torch
 import numpy as np
 
+
+class FenceParams():
+    def __init__(self, fence_dict: dict[str, int], Kfstart: int, Kfend: int, hkr_target_values: dict[int, float], hk_target_values: dict[int, float]):
+        """
+        Creates a new FENCE Params object
+        
+        Description:
+            Creates a FENCE params object which stores the FENCE dict and the position loss target values
+        
+        Params: 
+            @fence_dict: A dict of features and their corresponding fence dimensions, e.g. {'dogs': (3065, 3068), 'cats': (3061, 3064)}. 
+             These dimensions are 1-indexed and inclusive of both the start and ending numbers passed into the tuples. 
+             For example, (3061, 3064) means dimensions 3061, 3062, 3063, and 3064.
+            @Kfstart: The index (1-indexed) of the first transformer block with which to calculate position loss.
+            @Kfend: The index (1-indexed) of the last transformer block with which to calculate position loss.
+            @hkr_target_values: A dict where the keys are the layer index (1-indexed), and the values representing the target FENCE values for each
+             layer's residual stream output.
+            @hk_target_values: A dict where the keys are the layer index (1-indexed), and the values representing the target FENCE values for each 
+             layer's transformer block output.
+        """
+        if not all(r1[1] < r2[0] for r1, r2 in zip(sorted(fence_dict.values()), sorted(fence_dict.values())[1:])):
+            raise ValueError('FENCE dict contains overlapping values')
+
+        if not all(curr[0] > prev[0] for prev, curr in zip(fence_dict.values(), list(fence_dict.values())[1:])):
+            raise ValueError('FENCE dict not passed in order!')
+
+        self.fence_dict = fence_dict
+        self.Kfstart = Kfstart
+        self.Kfend = Kfend
+        self.Kf = Kfend - Kfstart + 1
+        self.hkr_target_values = hkr_target_values
+        self.hk_target_values = hk_target_values
+        self.Df = sum([v[1] - v[0] + 1 for k, v in fence_dict.items()])
+        self.Df_indices = [i - 1 for start, end in fence_dict.values() for i in range(start, end + 1)]
+
+    def to_dict(self):
+        return {
+            'fence_dict': self.fence_dict,
+            'Kfstart': self.Kfstart,
+            'Kfend': self.Kfend,
+            'hkr_target_values': self.hkr_target_values,
+            'hk_target_values': self.hk_target_values,
+            'Df': self.Df,
+            'Df_indices': self.Df_indices
+        }
+
+    def __str__(self):
+        return (f"FENCE Params Object:\n"
+                f"  FENCE Dictionary: {self.fence_dict}\n"
+                f"  Number of position loss layers: {self.Kf} (Layer {self.Kfstart} to layer {self.Kfend})\n"
+                f"  Df: {self.Df}  \n"
+                f"  hkr_target_values: {self.hkr_target_values}\n"
+                f"  hk_target_values: {self.hk_target_values}\n"
+                f"  Df_indices (0-indexed): {self.Df_indices}")
+        
+    def __repr__(self):
+        return self.__str__()
+
+
 class FenceDataSet(torch.utils.data.Dataset):
     def __init__(self, tokens: dict, fence_dict: dict[str, int], feature_classifications: list[dict[str, int]], position_mask_start_token_id: int | list[int] | None = None):
         """
