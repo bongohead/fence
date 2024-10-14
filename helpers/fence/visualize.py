@@ -70,9 +70,9 @@ def visualize_fence(
         aspect = 'auto'
         )\
         .update_layout(
-            height = 10 + len(custom_y) * 11,
+            height = 10 + len(custom_y) * 12,
             plot_bgcolor = 'white', paper_bgcolor = 'white', margin = dict(l = 50, r = 0, t = 50, b = 20),
-            coloraxis_colorbar = {'orientation': 'h', 'yanchor': 'top', 'xanchor': 'right', 'y': -0.1, 'x': 1.0, 'title': None, 'len': 0.2, 'thickness': 10, 'tickfont': {'size': 9}}
+            coloraxis_colorbar = {'orientation': 'h', 'yanchor': 'top', 'xanchor': 'right', 'y': -0.1, 'x': 1.0, 'title': None, 'len': 0.2, 'thickness': 10, 'tickfont': {'size': 10}}
         )\
         .update_yaxes(tickvals = list(range(len(custom_y))), ticktext = custom_y, tickfont = {'size': 10.5})\
         .update_xaxes(tickvals = filtered_indices, ticktext = filtered_x, tickfont = {'size': 10.5})
@@ -86,7 +86,7 @@ def visualize_fence(
                 x = (start_ix + end_ix - 1)/2, y = -2, xref = 'x', yref = 'y', 
                 # text =  fname + ' (<span style="text-decoration:overline">D<sub>f</sub></span> = ' + str(test_mat[:, (start_ix - 1):end_ix].mean().round(2)) + ')',
                 text =  fname,
-                showarrow = False, font = {'color': 'black', 'size': 9}, align = 'center'
+                showarrow = False, font = {'color': 'black', 'size': 11}, align = 'center'
             )
 
     return fig
