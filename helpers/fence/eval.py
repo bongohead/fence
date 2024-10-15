@@ -155,3 +155,51 @@ def generate_fence(model, tokenizer, prompt, echo_output = True, max_tokens = 12
         'hkmlps': all_hkmlps
     }
 
+
+
+@torch.no_grad()
+def get_logit_lens(model, hidden_state, top_k):
+    """
+    Feed an intermediate B x N x D hidden state block into the RMSNorm and LM Head to get the logit lens output.
+
+    Params:
+        @model: The Phi-3 model object. Must have model.model.norm as the final post-transformer norm layer, and model.lm_head as the LM head.
+        @hidden_state: A B x N x D hidden state object to feed through the logit lens.
+        @top_k: The top k probability tokens to return.
+    Returns:
+        A dataframe with columns input_index, token_rank, token, and probability.
+    """
+    
+    hidden_state = model.model.norm(transformer_output)
+
+    # Run LM head
+    logits = model.lm_head(hidden_state).float() # B x N x D
+    #### End Forward Pass ######
+
+    last_token_logits = logits[:, -1, :]
+    
+    probabilities = F.softmax(last_token_logits, dim = -1)
+
+    # Optionally, map the probabilities to tokens using the tokenizer's vocabulary
+    top_probabilities, top_indices = torch.topk(probabilities, top_k, dim=-1)  # B x top_k
+
+    res = {'input_index': [], 'token_rank': [], 'token': [], 'probability': []}
+
+    # Iterate over batch size and fill the data
+    batch_size = top_probabilities.size(0)
+    for i in range(batch_size):
+        for rank in range(top_k):
+            # Extract token id and probability
+            token_idx = top_indices[i, rank].item()
+            prob = round(top_probabilities[i, rank].item(), 6)
+
+            # Decode token using the tokenizer
+            token = tokenizer.decode([token_idx])
+
+            # Append data to the lists
+            res['probability'].append(prob)
+            res['input_index'].append(i)
+            res['token_rank'].append(rank + 1)  # rank starts from 1
+            res['token'].append(token)
+
+    return pd.DataFrame(res)
