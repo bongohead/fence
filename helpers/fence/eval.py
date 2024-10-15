@@ -13,6 +13,8 @@ from termcolor import colored
 from helpers.misc import is_notebook
 from helpers.phi3.phi3 import _prepare_4d_causal_attention_mask, apply_rotary_pos_emb
 
+import pandas as pd 
+
 @torch.no_grad()
 def generate_fence(model, tokenizer, prompt, echo_output = True, max_tokens = 128, device = 'cuda'):
     """
@@ -158,23 +160,26 @@ def generate_fence(model, tokenizer, prompt, echo_output = True, max_tokens = 12
 
 
 @torch.no_grad()
-def get_logit_lens(model, hidden_state, top_k):
+def get_logit_lens(model, tokenizer, hidden_state, top_k):
     """
     Feed an intermediate B x N x D hidden state block into the RMSNorm and LM Head to get the logit lens output.
 
     Params:
         @model: The Phi-3 model object. Must have model.model.norm as the final post-transformer norm layer, and model.lm_head as the LM head.
+        @tokenizer: A tokenizer
         @hidden_state: A B x N x D hidden state object to feed through the logit lens.
         @top_k: The top k probability tokens to return.
     Returns:
         A dataframe with columns input_index, token_rank, token, and probability.
     """
     
-    hidden_state = model.model.norm(transformer_output)
+    #### Finish Forward Pass #####
+    # RMS Norm
+    hidden_state = model.model.norm(hidden_state)
 
     # Run LM head
     logits = model.lm_head(hidden_state).float() # B x N x D
-    #### End Forward Pass ######
+    #### End Forward Pass #####
 
     last_token_logits = logits[:, -1, :]
     
