@@ -208,3 +208,61 @@ def get_logit_lens(model, tokenizer, hidden_state, top_k):
             res['token'].append(token)
 
     return pd.DataFrame(res)
+
+@torch.no_grad()
+def get_logit_lens_diff(model, tokenizer, hidden_state1, hidden_state2, top_k, use_logdiff = True):
+    """
+    Feed two B x N x D hidden state blocks into the RMSNorm and LM Head to get the differential logit lens output.
+
+    Params:
+        @model: The model object. Must have model.model.norm as the final post-transformer norm layer, and model.lm_head as the LM head.
+        @tokenizer: A tokenizer
+        @hidden_state1: The first B x N x D hidden state object to feed through the logit lens.
+        @hidden_state2: The second B x N x D hidden state object to feed through the logit lens.
+        @top_k: The top k tokens with the greatest probability difference to return.
+        @use_logdiff: Whether to use a log-difference [log (hidden_state2/hidden_state1)] or a base sum difference.
+    Returns:
+        A dataframe with columns input_index, token_rank, token, and probability_difference.
+    """
+
+    #### Finish Forward Pass for First Hidden State #####
+    hidden_state1 = model.model.norm(hidden_state1)
+    logits1 = model.lm_head(hidden_state1).float()  # B x N x D
+    last_token_logits1 = logits1[:, -1, :]
+    probabilities1 = F.softmax(last_token_logits1, dim=-1)  # Get probabilities for hidden_state1
+
+    #### Finish Forward Pass for Second Hidden State #####
+    hidden_state2 = model.model.norm(hidden_state2)
+    logits2 = model.lm_head(hidden_state2).float()  # B x N x D
+    last_token_logits2 = logits2[:, -1, :]
+    probabilities2 = F.softmax(last_token_logits2, dim=-1)  # Get probabilities for hidden_state2
+
+    #### Compute Probability Difference ####
+    if use_logdiff:
+        probability_diff = torch.log(probabilities2 + 1e-10) - torch.log(probabilities1 + 1e-10)
+    else:
+        probability_diff = probabilities2 - probabilities1
+        
+    # Get top_k tokens with the greatest probability difference
+    top_prob_diff, top_indices_diff = torch.topk(torch.abs(probability_diff), top_k, dim = -1) 
+
+    res = {'input_index': [], 'token_rank': [], 'token': [], 'diff': []}
+
+    # Iterate over batch size and fill the data
+    batch_size = top_prob_diff.size(0)
+    for i in range(batch_size):
+        for rank in range(top_k):
+            # Extract token id and probability difference
+            token_idx = top_indices_diff[i, rank].item()
+            prob_diff = round(probability_diff[i, token_idx].item(), 6)  # Get original (signed) difference
+
+            # Decode token using the tokenizer
+            token = tokenizer.decode([token_idx])
+
+            # Append data to the lists
+            res['diff'].append(prob_diff)
+            res['input_index'].append(i)
+            res['token_rank'].append(rank + 1)  # rank starts from 1
+            res['token'].append(token)
+
+    return pd.DataFrame(res)
