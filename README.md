@@ -1,5 +1,6 @@
 ## About
 *Updated Oct 2024*
+
 This repo contains training and testing code for **Feature Encapsulation for Neural Circuit Explainability (FENCE)**.
 <p align="center">
   <img src="https://github.com/bongohead/fence/blob/master/docs/t1.png?raw=true" alt="FENCE diagram" height="300"/>
@@ -50,7 +51,7 @@ Next, to connect via VSCode/Positron:
     </summary>
     ```
 
-### Monitoring
+## Monitoring
 You can use the following function to monitor GPU memory:
 ```
 import torch
