@@ -12,6 +12,16 @@ def get_modularity_loss_v1(H, V, target_dims):
 
     Returns:
         The computed normalized L1 modularity loss for the restricted dimensions.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda')
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v1(H, V, target_dims = [3040, 3052])
+        end = time.time()
+        print(end - start)
+        print(loss)
     """
     
     _, _, D = H.shape
@@ -69,6 +79,16 @@ def get_modularity_loss_v2(H, V, target_dims):
 
     Returns:
         The computed normalized L1 modularity loss for the restricted dimensions.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda')
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v2(H, V, target_dims = [3040, 3052])
+        end = time.time()
+        print(end - start)
+        print(loss)
     """
     
     _, _, D = H.shape
@@ -118,6 +138,16 @@ def get_modularity_loss_v3(H, V, target_dims):
 
     Returns:
         The computed normalized L1 modularity loss for the restricted dimensions.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda')
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v3(H, V, target_dims = [3040, 3052])
+        end = time.time()
+        print(end - start)
+        print(loss)
     """
     
     B, N, D = H.shape 
@@ -146,7 +176,7 @@ def get_modularity_loss_v3(H, V, target_dims):
 
                 # Accumulate weighted interactions (numerator) across batches and tokens
                 weighted_interaction_total += weighted_interaction
-                
+
                 # Accumulate unweighted interactions (denominator)
                 sum_interaction_total += interaction * v_interaction
 
