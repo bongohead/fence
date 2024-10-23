@@ -154,8 +154,10 @@ def get_modularity_loss_v3(H, V, target_dims):
     loss = torch.zeros(1, device = H.device)
     abs_H = torch.abs(H)
 
-    # Use torch.einsum to compute pairwise element-wise interactions across all rows of V
-    v_interaction_matrix = torch.einsum('ik,jk->ij', V.abs(), V.abs())  # D x D
+    # Compute pairwise dot product interactions across all rows of V
+    # v_interaction(i, j) = \Sum_{l=1}^I |V[i, l] * V[j, l]| (i.e., the influence of the components of the ith through jth dimensions of H interact through V)
+    # Thus v(i, j) represents the total interaction between two dimensions i and j in H
+    v_interaction_matrix = torch.matmul(V.abs(), V.abs().T)  # D x D
 
     # Initialize tensors to accumulate numerator and denominator across all batches and tokens
     weighted_interaction_total = torch.zeros((B, N), device = H.device)
@@ -210,8 +212,8 @@ def get_modularity_loss_v3(H, V, target_dims):
 #     # Precompute the absolute values of H for target dimensions
 #     abs_H = torch.abs(H)
 
-#     # Use torch.einsum to compute pairwise element-wise interactions across all rows of V
-#     v_interaction_matrix = torch.einsum('ik,jk->ij', V.abs(), V.abs())  # Shape: (D, D)
+#     # Compute pairwise element-wise interactions across all rows of V
+#     v_interaction_matrix = torch.matmul(V.abs(), V.abs().T)  # D x D
 
 #     # Initialize tensors to accumulate numerator and denominator across all batches and tokens
 #     weighted_interaction_total = torch.zeros((B, N), device=H.device)
