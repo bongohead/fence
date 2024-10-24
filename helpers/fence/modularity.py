@@ -70,7 +70,7 @@ def get_modularity_loss_v2(H, V, target_dims):
         - Recycles the v_interaction calculation for each pair (i, j)
         - Calculates abs value of H once
         
-        Reduced benchmark time with Df = 2 from .55s -> .35s
+        Reduced benchmark time with Df = 2 from .55s (v1) -> .35s (v2)
 
     Params:
         @H: A B x N x D hidden state tensor
