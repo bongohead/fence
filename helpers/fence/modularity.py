@@ -122,7 +122,7 @@ def get_modularity_loss_v2(H, V, target_dims):
 def get_modularity_loss_v3(H, V, target_dims):
     """
     Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
-    considering only interactions involving the specified target dimensions, while avoiding memory issues.
+     considering only interactions involving the specified target dimensions, while avoiding memory issues.
     
     Details:
         Optimizes `get_modularity_loss_v2` by:
@@ -191,8 +191,84 @@ def get_modularity_loss_v3(H, V, target_dims):
 
     return loss
 
+def get_modularity_loss_v4(H, V, target_dims):
+    """
+    Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
+     considering only interactions involving the specified target dimensions across multiple layers.
 
-# def get_modularity_loss_v4(H, V, target_dims, neighbor_range=1):
+    Details:
+        The same as `get_modularity_loss_v3`, but with two changes:
+            1. Accepts an H tensor of B x K x N x D, instead of B x N x D, and vectorizes over K layers
+            2. Calculates normalization seperately per target dimension and per layer, instead of a shared normalization for each.
+
+    Params:
+        @H: A B x K x N x D hidden state tensor
+        @V: The D x I weight tensor which is multiplied by H
+        @target_dims: The list of dimensions (0-indexed) within H to consider for the restricted loss calculation.
+
+    Returns:
+        A K x ||target dimensions|| tensor of L1 modularity losses.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda').unsqueeze(1).repeat(1, 32, 1, 1)
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v4(H, V, target_dims = [3040, 3052])
+        end = time.time()
+        print(end - start)
+        print(loss)
+    """
+    
+    B, K, N, D = H.shape 
+    abs_H = torch.abs(H)
+
+    # Precompute pairwise interaction between dimensions in V (D x D matrix)
+    v_interaction_matrix = torch.matmul(V.abs(), V.abs().T)  # Shape: D x D
+
+    # Initialize the K x ||target dimensions|| output tensor for storing losses for each layer and target dimension
+    losses = torch.zeros((K, len(target_dims)), device = H.device)
+
+    # Compute the numerator (distance-weighted) and denominator (unweighted) for each target dimension
+    for idx, i in enumerate(target_dims):
+        # Initialize accumulators for the current target dimension
+        weighted_interaction_total = torch.zeros((B, K, N), device=H.device)
+        sum_interaction_total = torch.zeros((B, K, N), device=H.device)
+        
+        for j in range(D):
+            if i != j: 
+                # Compute interaction term |h_i * h_j * v_i * v_j| across B x K x N on the fly
+                interaction = abs_H[..., i] * abs_H[..., j]  # Shape: B x K x N
+
+                # Use precomputed pairwise element-wise interaction in V
+                v_interaction = v_interaction_matrix[i, j]
+                
+                # Calculate distance-weighted interaction for numerator
+                weighted_interaction = interaction * v_interaction * abs(i - j)
+
+                # Accumulate weighted interactions (numerator) across batches, layers, and tokens
+                weighted_interaction_total += weighted_interaction
+
+                # Accumulate unweighted interactions (denominator)
+                sum_interaction_total += interaction * v_interaction
+
+        # Sum over batches and tokens to compute the loss for each layer for the current target dimension
+        layer_weighted_sums = weighted_interaction_total.sum(dim = (0, 2))  # Shape: K
+        layer_sum_interactions = sum_interaction_total.sum(dim = (0, 2))    # Shape: K
+    
+        # Normalize each layer's loss for the current target dimension
+        layer_losses = torch.where(
+            layer_sum_interactions > 0, 
+            layer_weighted_sums / layer_sum_interactions, 
+            torch.zeros_like(layer_sum_interactions)
+            )
+        
+        # Store the result in the losses tensor
+        losses[:, idx] = layer_losses
+
+    return losses
+
+# def get_modularity_loss_cubed(H, V, target_dims, neighbor_range=1):
 # TBD: Same as v3 but only calculates loss within a certian neighbor range (e.g. if neighbor_range = 3072, the result equals v2 result)
 #     """
 #     Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
