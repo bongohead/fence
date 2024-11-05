@@ -1,5 +1,5 @@
 ## About
-*Updated Oct 2024*
+*Updated Nov 2024*
 
 This repo contains training and testing code for **Feature Encapsulation for Neural Circuit Explainability (FENCE)**.
 <p align="center">
