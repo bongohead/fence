@@ -258,8 +258,8 @@ def get_modularity_loss_v4(H, V, target_dims):
     
         # Normalize each layer's loss for the current target dimension
         layer_losses = torch.where(
-            layer_sum_interactions > 0, 
-            layer_weighted_sums / layer_sum_interactions, 
+            layer_sum_interactions > 1e-8, 
+            layer_weighted_sums / (layer_sum_interactions + 1e-8), 
             torch.zeros_like(layer_sum_interactions)
             )
         
