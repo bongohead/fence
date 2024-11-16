@@ -258,8 +258,8 @@ def get_modularity_loss_v4(H, V, target_dims):
     
         # Normalize each layer's loss for the current target dimension
         layer_losses = torch.where(
-            layer_sum_interactions > 0, 
-            layer_weighted_sums / layer_sum_interactions, 
+            layer_sum_interactions > 1e-8, 
+            layer_weighted_sums / (layer_sum_interactions + 1e-8), 
             torch.zeros_like(layer_sum_interactions)
             )
         
@@ -267,6 +267,86 @@ def get_modularity_loss_v4(H, V, target_dims):
         losses[:, idx] = layer_losses
 
     return losses
+
+def get_modularity_loss_v5(H, V, target_dims, block_size=1):
+    """
+    Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
+     considering only interactions involving the specified target dimensions across multiple layers.
+
+    Details:
+        The same as `get_modularity_loss_v4`, but with two changes:
+            1. Vectorizes over dimensions
+            2. Allows for grouping dimensions into "blocks", where elements in each block are considered the same distance. Set block_size = 1 to replicate `get_modularity_loss_v4`. 
+
+        Reduced benchmark time with Df = 3 from .29s (v4) to .02s (v5)
+
+    Params:
+        @H: A B x K x N x D hidden state tensor
+        @V: The D x I weight tensor which is multiplied by H
+        @target_dims: The list of dimensions (0-indexed) within H to consider for the restricted loss calculation.
+        @block_size: The size of each block, s.t. elements of each block are considered the same distance away from the target dim. Set block_size = 1 to replicate `get_modularity_loss_v4`.
+         With block_size=10: distances 0-9 get weight 0; distances 10-19 get weight 1; distances 20-29 get weight 2; etc.
+
+
+    Returns:
+        A K x ||target dimensions|| tensor of L1 modularity losses.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda').unsqueeze(1).repeat(1, 32, 1, 1)
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v5(H, V, target_dims = [3040, 3052], block_size = 1)
+        end = time.time()
+        print(end - start)
+        print(loss)
+    """ 
+        
+    B, K, N, D = H.shape
+    losses = torch.zeros((K, len(target_dims)), device = H.device)
+    abs_H = torch.abs(H)
+
+    # Compute pairwise dot product interactions across all rows of V
+    # v_interaction(i, j) = \Sum_{l=1}^I |V[i, l] * V[j, l]| (i.e., the influence of the components of the ith through jth dimensions of H interact through V)
+    # Thus v(i, j) represents the total interaction between two dimensions i and j in H
+    v_interaction_matrix = torch.matmul(V.abs(), V.abs().T)  # D x D
+
+    # Cast distances into blocks
+    distances = torch.arange(D, device = H.device)
+    blocked_distances = torch.zeros((len(target_dims), D), device = H.device)
+    
+    for idx, target_dim in enumerate(target_dims):
+        # dist_from_target = torch.abs(distances - target_dim)
+        # blocked_distances[idx] = dist_from_target  # Just use direct distances when block_size=1
+        # Instead of raw distances, use block indices
+        dist_from_target = torch.abs(distances - target_dim)  # D
+        # Each entry gets the index of its block: 0 for [0,block_size), 1 for [block_size,2*block_size), etc.
+        blocked_distances[idx] = torch.div(dist_from_target, block_size, rounding_mode='floor')  # D
+
+    
+    # Iterate through target dims
+    for idx, i in enumerate(target_dims):
+        block_weights = blocked_distances[idx]
+        
+        # Create mask to exclude self-interaction
+        mask = torch.ones(D, device = H.device)
+        mask[i] = 0
+        
+        interactions = abs_H[..., i].unsqueeze(-1) * abs_H
+        v_interactions = v_interaction_matrix[i] * mask  # Apply mask to exclude self-interaction, to mimic v4
+        
+        weighted_sum = (interactions * v_interactions * block_weights).sum(dim=-1)
+        total_sum = (interactions * v_interactions).sum(dim=-1)
+        
+        # Match original zero handling
+        losses[:, idx] = torch.where(
+            total_sum.sum(dim = (0, 2)) > 0,
+            weighted_sum.sum(dim = (0, 2)) / (total_sum.sum(dim = (0, 2)) + 1e-8),
+            torch.zeros_like(total_sum.sum(dim = (0, 2)))
+        )
+
+    return losses
+
 
 # def get_modularity_loss_cubed(H, V, target_dims, neighbor_range=1):
 # TBD: Same as v3 but only calculates loss within a certian neighbor range (e.g. if neighbor_range = 3072, the result equals v2 result)
