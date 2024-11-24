@@ -31,7 +31,14 @@ def clear_all_cuda_memory():
 
 def profile_memory(func, *args, **kwargs):
     """
-    Profile peak memory usage of a function.
+    Profile peak CUDA memory usage of a torch function.
+
+    Params
+    @func: The function to test 
+    @args, kwarsg: Arguments to pass to the function
+    
+    Examples:
+        profile_memory(np.diff, [0, 2, 5, 10, 12], n = 1)
     """
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.empty_cache()
@@ -45,11 +52,11 @@ def profile_memory(func, *args, **kwargs):
     end_mem = torch.cuda.memory_allocated()
     peak_mem = torch.cuda.max_memory_allocated()
     
-    print(f"\nMemory Profile for {func.__name__}:")
-    print(f"Starting memory: {start_mem/1e6:.1f}MB")
-    print(f"Ending memory: {end_mem/1e6:.1f}MB")
-    print(f"Peak memory: {peak_mem/1e6:.1f}MB")
-    print(f"Memory increase: {(end_mem - start_mem)/1e6:.1f}MB")
-    print(f"Time taken: {end_time - start_time:.3f}s")
-    
-    return result
+    return {
+        'name': func.__name__,
+        'start_memory': f"{start_mem/1e6:.1f}MB",
+        'end_memory': f"{end_mem/1e6:.1f}MB", 
+        'peak_memory': f"{peak_mem/1e6:.1f}MB",
+        'memory_increase': f"{(end_mem - start_mem)/1e6:.1f}MB",
+        'time': f"{end_time - start_time:.3f}s"
+    }
