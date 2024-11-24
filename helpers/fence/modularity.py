@@ -1,3 +1,5 @@
+# Modularity loss functions
+ 
 import torch
 
 def get_modularity_loss_v1(H, V, target_dims):
@@ -285,7 +287,7 @@ def get_modularity_loss_v5(H, V, target_dims, block_size=1):
         @V: The D x I weight tensor which is multiplied by H
         @target_dims: The list of dimensions (0-indexed) within H to consider for the restricted loss calculation.
         @block_size: The size of each block, s.t. elements of each block are considered the same distance away from the target dim. Set block_size = 1 to replicate `get_modularity_loss_v4`.
-         With block_size=10: distances 0-9 get weight 0; distances 10-19 get weight 1; distances 20-29 get weight 2; etc.
+         With block_size=10: distances 0-9 get weight 5; distances 10-19 get weight 15; distances 20-29 get weight 25; etc.
 
 
     Returns:
@@ -316,13 +318,9 @@ def get_modularity_loss_v5(H, V, target_dims, block_size=1):
     blocked_distances = torch.zeros((len(target_dims), D), device = H.device)
     
     for idx, target_dim in enumerate(target_dims):
-        # dist_from_target = torch.abs(distances - target_dim)
-        # blocked_distances[idx] = dist_from_target  # Just use direct distances when block_size=1
-        # Instead of raw distances, use block indices
-        dist_from_target = torch.abs(distances - target_dim)  # D
-        # Each entry gets the index of its block: 0 for [0,block_size), 1 for [block_size,2*block_size), etc.
-        blocked_distances[idx] = torch.div(dist_from_target, block_size, rounding_mode='floor')  # D
-
+        raw_distances = torch.abs(distances - target_dim)
+        blocked_idx = torch.div(raw_distances, block_size, rounding_mode='floor')
+        blocked_distances[idx] = blocked_idx * block_size
     
     # Iterate through target dims
     for idx, i in enumerate(target_dims):
@@ -347,60 +345,90 @@ def get_modularity_loss_v5(H, V, target_dims, block_size=1):
 
     return losses
 
+def get_modularity_loss_v6(H, V, target_dims, block_size = 1, chunk_size = 256):
+    """
+    Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
+     considering only interactions involving the specified target dimensions across multiple layers.
 
-# def get_modularity_loss_cubed(H, V, target_dims, neighbor_range=1):
-# TBD: Same as v3 but only calculates loss within a certian neighbor range (e.g. if neighbor_range = 3072, the result equals v2 result)
-#     """
-#     Computes the normalized L1 distance-weighted modularity loss for the given input tensors H and V,
-#     considering only interactions involving the specified target dimensions, while avoiding memory issues.
+    Details:
+        The same as `get_modularity_loss_v5`, but with several changes for memory efficiency:
+            1. Chunk-wise processing; reducing the H interaction matrix of size B x K x N x D into pieces of size B x K x N x chunk_size
+            2. Only calculates needed rows for the V interaction matrix instead of the entire D x D matrix
+
+        Reduced peak memory excl inputs in below example from 12GB -> 1GB (note that `get_modularity_loss_v4` used ~2GB)
+
+    Params:
+        @H: A B x K x N x D hidden state tensor
+        @V: The D x I weight tensor which is multiplied by H
+        @target_dims: The list of dimensions (0-indexed) within H to consider for the restricted loss calculation.
+        @block_size: The size of each block, s.t. elements of each block are considered the same distance away from the target dim. Set block_size = 1 to replicate `get_modularity_loss_v4`.
+         With block_size=10: distances 0-9 get weight 5; distances 10-19 get weight 15; distances 20-29 get weight 25; etc.
+        @chunk_size: The chunk size when calculating the H interaction matrix; toggle this appropriately for memory tradeoff (larger size = more memory)
+
+    Returns:
+        A K x ||target dimensions|| tensor of L1 modularity losses.
+
+    Examples:
+        torch.manual_seed(0)
+        H = torch.randn(10, 1024, 3072, dtype = torch.bfloat16, device = 'cuda').unsqueeze(1).repeat(1, 32, 1, 1)
+        V = torch.randn(3072, 8192, dtype = torch.bfloat16, device = 'cuda')
+        start = time.time()
+        loss = get_modularity_loss_v6(H, V, target_dims = [3040, 3052], block_size = 1, chunk_size = 256)
+        end = time.time()
+        print(end - start)
+        print(loss)
+    """ 
+
+    B, K, N, D = H.shape
+    losses = torch.zeros((K, len(target_dims)), device=H.device)
     
-#     Params:
-#         @H: A B x N x D hidden state tensor
-#         @V: The D x I weight tensor which is multiplied by H
-#         @target_dims: The list of dimensions (0-indexed) within H to consider for the restricted loss calculation.
-
-#     Returns:
-#         The computed normalized L1 modularity loss for the restricted dimensions.
-#     """
+    # Compute pairwise dot product interactions across all rows of V
+    # v_interaction(i, j) = \Sum_{l=1}^I |V[i, l] * V[j, l]| (i.e., the influence of the components of the ith through jth dimensions of H interact through V)
+    # Thus v(i, j) represents the total interaction between two dimensions i and j in H   
+    # Note that for v6, this only computes needed rows; v5 computed the full D x D interaction matrix: O(||target_dims|| x D) instead of O(D^2)
+    target_rows = torch.tensor(target_dims, device = H.device)
+    v_target = V.abs()[target_rows]  # len(target_dims) x I
+    v_interaction_rows = torch.matmul(v_target, V.abs().T)  # len(target_dims) x D
     
-#     B, N, D = H.shape  # Batch size (B), token length (N), dimension (D)
-
-#     # Precompute the absolute values of H for target dimensions
-#     abs_H = torch.abs(H)
-
-#     # Compute pairwise element-wise interactions across all rows of V
-#     v_interaction_matrix = torch.matmul(V.abs(), V.abs().T)  # D x D
-
-#     # Initialize tensors to accumulate numerator and denominator across all batches and tokens
-#     weighted_interaction_total = torch.zeros((B, N), device=H.device)
-#     sum_interaction_total = torch.zeros((B, N), device=H.device)
-
-#     # Compute the numerator (distance-weighted) and denominator (unweighted)
-#     for i in target_dims:
-#         # Only consider neighbors within the specified range
-#         for j in range(max(0, i - neighbor_range), min(D, i + neighbor_range + 1)):
-#             if i != j:  # Skip self-interaction
-#                 # Compute the pre-cached interaction term |h_i * h_j| using the precomputed absolute values
-#                 interaction = abs_H[:, :, i] * abs_H[:, :, j]
-
-#                 # Use precomputed pairwise element-wise interaction in V
-#                 v_interaction = v_interaction_matrix[i, j]
-                
-#                 # Calculate distance-weighted interaction for numerator
-#                 weighted_interaction = interaction * v_interaction * abs(i - j)
-
-#                 # Accumulate weighted interactions (numerator) across batches and tokens
-#                 weighted_interaction_total += weighted_interaction
-
-#                 # Accumulate unweighted interactions (denominator)
-#                 sum_interaction_total += interaction * v_interaction
-
-#     # Sum over batches and tokens outside the loop to compute the final loss
-#     loss = weighted_interaction_total.sum()
-#     sum_interactions = sum_interaction_total.sum()
-
-#     # Normalize the loss
-#     if sum_interactions > 0:
-#         loss = loss / sum_interactions
-
-#     return loss
+    # Compute distances once, with proper scaling
+    distances = torch.arange(D, device = H.device)
+    blocked_distances = torch.zeros((len(target_dims), D), device = H.device)
+    
+    for idx, target_dim in enumerate(target_dims):        
+        raw_distances = torch.abs(distances - target_dim)
+        blocked_idx = torch.div(raw_distances, block_size, rounding_mode = 'floor')
+        blocked_distances[idx] = blocked_idx * block_size
+    
+    # Now iterate over the target dims and calculate losses
+    for idx, i in enumerate(target_dims):
+        h_i = H[..., i].abs().unsqueeze(-1)  # B x K x N x 1
+        v_interactions = v_interaction_rows[idx] # D
+        
+        # Mask self-interaction
+        mask = torch.ones(D, device=H.device)
+        mask[i] = 0
+        v_interactions = v_interactions * mask
+        
+        # Use in-place operations where possible
+        weighted_sum = torch.zeros((B, K, N), device = H.device)
+        total_sum = torch.zeros((B, K, N), device = H.device)
+        
+        # Process in chunks for memory efficiency: O(BKND) → O(BKND/num_chunks)
+        for chunk_start in range(0, D, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, D)
+            
+            # Process chunk
+            h_chunk = H[..., chunk_start:chunk_end].abs()
+            chunk_interaction = (h_i * h_chunk * v_interactions[chunk_start:chunk_end])
+            # Uses in-place addition for memory efficiency
+            weighted_sum.add_((chunk_interaction * blocked_distances[idx, chunk_start:chunk_end]).sum(dim = -1))
+            total_sum.add_(chunk_interaction.sum(dim = -1))
+        
+        # Compute normalized loss
+        losses[:, idx] = torch.where(
+            total_sum.sum(dim = (0, 2)) > 0,
+            weighted_sum.sum(dim = (0, 2)) / (total_sum.sum(dim = (0, 2)) + 1e-8),
+            torch.zeros_like(total_sum.sum(dim = (0, 2)))
+        )
+    
+    return losses
