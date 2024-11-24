@@ -1,5 +1,6 @@
 import torch
 import gc
+import time 
 
 def check_memory():
     print("Allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
@@ -26,3 +27,29 @@ def clear_all_cuda_memory():
     #     torch.cuda.reset()
         
     print("All CUDA memory cleared on all devices.")
+
+
+def profile_memory(func, *args, **kwargs):
+    """
+    Profile peak memory usage of a function.
+    """
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.empty_cache()
+    start_mem = torch.cuda.memory_allocated()
+    
+    # Run function
+    start_time = time.time()
+    result = func(*args, **kwargs)
+    end_time = time.time()
+    
+    end_mem = torch.cuda.memory_allocated()
+    peak_mem = torch.cuda.max_memory_allocated()
+    
+    print(f"\nMemory Profile for {func.__name__}:")
+    print(f"Starting memory: {start_mem/1e6:.1f}MB")
+    print(f"Ending memory: {end_mem/1e6:.1f}MB")
+    print(f"Peak memory: {peak_mem/1e6:.1f}MB")
+    print(f"Memory increase: {(end_mem - start_mem)/1e6:.1f}MB")
+    print(f"Time taken: {end_time - start_time:.3f}s")
+    
+    return result
